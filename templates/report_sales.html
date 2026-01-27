@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h4 class="mb-3">Sales Report</h4>
+
+<form method="post" class="card p-3 mb-3" action="/reports/sales">
+
+    <div class="row">
+        <div class="col-md-4">
+            <label>From Date</label>
+            <input type="date" name="from_date" class="form-control" required value="{{ request.form.from_date }}">
+        </div>
+        <div class="col-md-4">
+            <label>To Date</label>
+            <input type="date" name="to_date" class="form-control" required value="{{ request.form.to_date }}">
+        </div>
+        <div class="col-md-4 align-self-end">
+            <button class="btn btn-primary">Show</button>
+        </div>
+    </div>
+
+</form>
+
+{% if sales_list %}
+
+<form method="post" action="/reports/sales/export" class="mb-3">
+    <input type="hidden" name="from_date" value="{{ request.form.from_date }}">
+    <input type="hidden" name="to_date" value="{{ request.form.to_date }}">
+    <button class="btn btn-success">Export to Excel</button>
+</form>
+
+<table class="table table-bordered table-sm">
+    <tr>
+        <th>Date</th>
+        <th>Customer</th>
+        <th>Product</th>
+        <th>Volume</th>
+        <th>Qty</th>
+    </tr>
+
+    {% for r in sales_list %}
+    <tr>
+        <td>{{ r.date }}</td>
+        <td>{{ r.customer_name }}</td>
+        <td>{{ r.product_name }}</td>
+        <td>{{ r.volume }}</td>
+        <td>{{ r.quantity }}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+{% endif %}
+
+{% endblock %}

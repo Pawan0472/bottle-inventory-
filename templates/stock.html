@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h4 class="mb-3">Finished Stock</h4>
+
+<table class="table table-bordered table-sm">
+    <tr>
+        <th>Product</th>
+        <th>Volume</th>
+        <th>Current Stock</th>
+    </tr>
+
+    {% for s in stock_list %}
+    <tr>
+        <td>{{ s.name }}</td>
+        <td>{{ s.volume }}</td>
+        <td>{{ s.current_stock }}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+{% endblock %}

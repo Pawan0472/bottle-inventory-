@@ -1,0 +1,5 @@
+Flask
+gunicorn
+werkzeug
+pandas
+openpyxl

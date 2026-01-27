@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h4 class="mb-4">Dashboard</h4>
+
+<!-- KPI CARDS -->
+<div class="row mb-4">
+
+    <div class="col-md-3">
+        <div class="card p-3 border-start border-primary border-4">
+            <h6 class="text-muted">Total Products</h6>
+            <h3>{{ total_products }}</h3>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card p-3 border-start border-success border-4">
+            <h6 class="text-muted">Customers</h6>
+            <h3>{{ total_customers }}</h3>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card p-3 border-start border-warning border-4">
+            <h6 class="text-muted">Suppliers</h6>
+            <h3>{{ total_suppliers }}</h3>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card p-3 border-start border-dark border-4">
+            <h6 class="text-muted">Finished Stock</h6>
+            <h3>{{ total_finished_stock }}</h3>
+        </div>
+    </div>
+
+</div>
+
+<!-- TODAY SUMMARY -->
+<div class="row mb-4">
+
+    <div class="col-md-6">
+        <div class="card p-4">
+            <h6 class="text-muted">Today Production</h6>
+            <h2 class="text-primary">{{ today_production }}</h2>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card p-4">
+            <h6 class="text-muted">Today Sales</h6>
+            <h2 class="text-success">{{ today_sales }}</h2>
+        </div>
+    </div>
+
+</div>
+
+<!-- PROFIT SNAPSHOT -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card p-3">
+            <h6 class="text-muted">Total Sales Qty</h6>
+            <h3 class="text-success">{{ total_sales_value }}</h3>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card p-3">
+            <h6 class="text-muted">Total Purchase Value</h6>
+            <h3 class="text-danger">{{ total_purchase_value }}</h3>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card p-3">
+            <h6 class="text-muted">Gross Movement</h6>
+            <h3 class="text-primary">{{ total_sales_value - total_purchase_value }}</h3>
+        </div>
+    </div>
+</div>
+
+<!-- LOW STOCK ALERTS -->
+<div class="row mb-4">
+
+    <div class="col-md-6">
+        <div class="card p-3 border-start border-danger border-4">
+            <h6 class="text-danger">Low Raw Materials</h6>
+            {% if low_raw_materials %}
+            <ul class="mb-0">
+                {% for r in low_raw_materials %}
+                <li>{{ r.name }} : {{ r.current_stock }} {{ r.unit }}</li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <span class="text-success">All raw materials sufficient</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card p-3 border-start border-warning border-4">
+            <h6 class="text-warning">Low Finished Products</h6>
+            {% if low_finished_products %}
+            <ul class="mb-0">
+                {% for p in low_finished_products %}
+                <li>{{ p.name }} ({{ p.volume }}) : {{ p.current_stock }}</li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <span class="text-success">All finished stock sufficient</span>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+
+<!-- CHARTS ROW 1 -->
+<div class="row mb-4">
+
+    <div class="col-md-6">
+        <div class="card p-3">
+            <h6>Sales Trend (Last 7 Days)</h6>
+            <canvas id="salesChart"></canvas>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card p-3">
+            <h6>Production by Product (Top 5)</h6>
+            <canvas id="productionChart"></canvas>
+        </div>
+    </div>
+
+</div>
+
+<!-- CHARTS ROW 2 -->
+<div class="row mb-4">
+
+    <div class="col-md-6">
+        <div class="card p-3">
+            <h6>Top Customers</h6>
+            <canvas id="customerChart"></canvas>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card p-3">
+            <h6>Top Suppliers</h6>
+            <canvas id="supplierChart"></canvas>
+        </div>
+    </div>
+
+</div>
+
+<script>
+const salesDates = {{ sales_dates | tojson }};
+const salesQty = {{ sales_qty | tojson }};
+
+const prodNames = {{ prod_names | tojson }};
+const prodQty = {{ prod_qty | tojson }};
+
+const custNames = {{ cust_names | tojson }};
+const custQty = {{ cust_qty | tojson }};
+
+const suppNames = {{ supp_names | tojson }};
+const suppQty = {{ supp_qty | tojson }};
+
+// Sales Line Chart
+new Chart(document.getElementById("salesChart"), {
+    type: "line",
+    data: {
+        labels: salesDates,
+        datasets: [{
+            label: "Sales Qty",
+            data: salesQty,
+            borderColor: "#0d6efd",
+            fill: false
+        }]
+    }
+});
+
+// Production Bar Chart
+new Chart(document.getElementById("productionChart"), {
+    type: "bar",
+    data: {
+        labels: prodNames,
+        datasets: [{
+            label: "Production Qty",
+            data: prodQty,
+            backgroundColor: "#198754"
+        }]
+    }
+});
+
+// Top Customers Chart
+new Chart(document.getElementById("customerChart"), {
+    type: "bar",
+    data: {
+        labels: custNames,
+        datasets: [{
+            label: "Sales Qty",
+            data: custQty,
+            backgroundColor: "#ffc107"
+        }]
+    }
+});
+
+// Top Suppliers Chart
+new Chart(document.getElementById("supplierChart"), {
+    type: "bar",
+    data: {
+        labels: suppNames,
+        datasets: [{
+            label: "Purchase Qty",
+            data: suppQty,
+            backgroundColor: "#6f42c1"
+        }]
+    }
+});
+</script>
+
+{% endblock %}

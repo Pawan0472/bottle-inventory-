@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h4 class="mb-3">Purchase</h4>
+
+<form method="post" enctype="multipart/form-data" class="card p-3 mb-4">
+
+    <div class="row mb-2">
+        <div class="col-md-2">
+            <label>Date</label>
+            <input type="date" name="date" class="form-control" required>
+        </div>
+
+        <div class="col-md-3">
+            <label>Supplier</label>
+            <select name="supplier_id" class="form-control" required>
+                <option value="">Select Supplier</option>
+                {% for s in suppliers %}
+                <option value="{{ s.id }}">{{ s.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="col-md-3">
+            <label>Material</label>
+            <select name="raw_material_id" class="form-control" required>
+                <option value="">Select Material</option>
+                {% for m in raw_materials %}
+                <option value="{{ m.id }}">{{ m.name }} ({{ m.unit }})</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="col-md-2">
+            <label>Qty</label>
+            <input type="number" step="0.001" name="quantity" class="form-control" required>
+        </div>
+
+        <div class="col-md-2">
+            <label>Rate</label>
+            <input type="number" step="0.01" name="rate" class="form-control" required>
+        </div>
+    </div>
+
+    <div class="row mb-2">
+        <div class="col-md-3">
+            <label>Bill No</label>
+            <input type="text" name="bill_number" class="form-control">
+        </div>
+        <div class="col-md-3">
+            <label>Bill Image</label>
+            <input type="file" name="bill_image" class="form-control">
+        </div>
+        <div class="col-md-6">
+            <label>Remarks</label>
+            <input type="text" name="remarks" class="form-control">
+        </div>
+    </div>
+
+    <button class="btn btn-primary">Save Purchase</button>
+</form>
+
+<table class="table table-bordered table-sm">
+    <tr>
+        <th>Date</th>
+        <th>Supplier</th>
+        <th>Material</th>
+        <th>Qty</th>
+        <th>Rate</th>
+    </tr>
+
+    {% for r in purchase_list %}
+    <tr>
+        <td>{{ r.date }}</td>
+        <td>{{ r.supplier_name }}</td>
+        <td>{{ r.material_name }}</td>
+        <td>{{ r.quantity }}</td>
+        <td>{{ r.rate }}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+{% endblock %}

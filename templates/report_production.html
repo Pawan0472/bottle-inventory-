@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Production Report</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<h2>Production Report</h2>
+
+<table border="1" width="100%">
+    <tr>
+        <th>Date</th>
+        <th>Product</th>
+        <th>Produced</th>
+        <th>Rejects</th>
+        <th>Remarks</th>
+    </tr>
+
+    {% for row in data %}
+    <tr>
+        <td>{{ row.date }}</td>
+        <td>{{ row.name }} ({{ row.volume }})</td>
+        <td>{{ row.quantity_produced }}</td>
+        <td>{{ row.rejects }}</td>
+        <td>{{ row.remarks }}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+<br>
+<a href="/reports">Back to Reports</a>
+
+</body>
+</html>

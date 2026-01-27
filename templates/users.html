@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h4 class="mb-3">User Management</h4>
+
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+<!-- ADD USER FORM -->
+<form method="post" class="card p-3 mb-4">
+
+    <h6>Add New User</h6>
+
+    <div class="row mb-2">
+        <div class="col-md-4">
+            <label>Username</label>
+            <input type="text" name="username" class="form-control" required>
+        </div>
+
+        <div class="col-md-4">
+            <label>Password</label>
+            <input type="text" name="password" class="form-control" required>
+        </div>
+
+        <div class="col-md-4">
+            <label>Role</label>
+            <select name="role" class="form-control" required>
+                <option value="admin">Admin</option>
+                <option value="data_entry">Data Entry</option>
+                <option value="viewer">Viewer</option>
+            </select>
+        </div>
+    </div>
+
+    <button class="btn btn-primary">Create User</button>
+</form>
+
+<!-- USERS LIST -->
+<table class="table table-bordered table-sm">
+    <tr>
+        <th>ID</th>
+        <th>Username</th>
+        <th>Role</th>
+        <th>Status</th>
+        <th>Reset Password</th>
+        <th>Delete</th>
+    </tr>
+
+    {% for u in users %}
+    <tr>
+        <td>{{ u.id }}</td>
+        <td>{{ u.username }}</td>
+        <td>{{ u.role }}</td>
+        <td>
+            {% if u.is_active == 1 %}
+                Active
+            {% else %}
+                Inactive
+            {% endif %}
+        </td>
+
+        <td>
+            <form method="post" action="/users/reset_password/{{ u.id }}" class="d-flex">
+                <input type="text" name="new_password" class="form-control form-control-sm me-2" placeholder="New password" required>
+                <button class="btn btn-sm btn-warning">Reset</button>
+            </form>
+        </td>
+
+        <td>
+            {% if u.id != session.user_id %}
+            <a href="/users/delete/{{ u.id }}" class="btn btn-sm btn-danger" onclick="return confirm('Delete this user?')">Delete</a>
+            {% else %}
+            -
+            {% endif %}
+        </td>
+    </tr>
+    {% endfor %}
+</table>
+
+{% endblock %}

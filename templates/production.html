@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h4 class="mb-3">Production</h4>
+
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+<form method="post" class="card p-3 mb-4">
+
+    <div class="row mb-2">
+        <div class="col-md-3">
+            <label>Date</label>
+            <input type="date" name="date" class="form-control" required>
+        </div>
+
+        <div class="col-md-3">
+            <label>Product</label>
+            <select name="product_id" class="form-control" required>
+                <option value="">Select Product</option>
+                {% for p in products %}
+                <option value="{{ p.id }}">{{ p.name }} ({{ p.volume }})</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="col-md-2">
+            <label>Quantity</label>
+            <input type="number" name="quantity_produced" class="form-control" required>
+        </div>
+
+        <div class="col-md-2">
+            <label>Rejects</label>
+            <input type="number" name="rejects" class="form-control" value="0">
+        </div>
+
+        <div class="col-md-2">
+            <label>Remarks</label>
+            <input type="text" name="remarks" class="form-control">
+        </div>
+    </div>
+
+    <button class="btn btn-primary">Save Production</button>
+</form>
+
+<table class="table table-bordered table-sm">
+    <tr>
+        <th>Date</th>
+        <th>Product</th>
+        <th>Qty</th>
+        <th>Rejects</th>
+        <th>Remarks</th>
+    </tr>
+    {% for r in production_list %}
+    <tr>
+        <td>{{ r.date }}</td>
+        <td>{{ r.product_name }} ({{ r.volume }})</td>
+        <td>{{ r.quantity_produced }}</td>
+        <td>{{ r.rejects }}</td>
+        <td>{{ r.remarks }}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+{% endblock %}

@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h4 class="mb-3">Sales</h4>
+
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+<form method="post" enctype="multipart/form-data" class="card p-3 mb-4">
+
+    <div class="row mb-2">
+        <div class="col-md-2">
+            <label>Date</label>
+            <input type="date" name="date" class="form-control" required>
+        </div>
+
+        <div class="col-md-3">
+            <label>Customer</label>
+            <select name="customer_id" class="form-control" required>
+                <option value="">Select Customer</option>
+                {% for c in customers %}
+                <option value="{{ c.id }}">{{ c.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="col-md-3">
+            <label>Product</label>
+            <select name="product_id" class="form-control" required>
+                <option value="">Select Product</option>
+                {% for p in products %}
+                <option value="{{ p.id }}">{{ p.name }} ({{ p.volume }})</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="col-md-2">
+            <label>Qty</label>
+            <input type="number" name="quantity" class="form-control" required>
+        </div>
+
+        <div class="col-md-2">
+            <label>Dispatch</label>
+            <select name="dispatch_type" class="form-control">
+                <option value="Transport">Transport</option>
+                <option value="Self Pickup">Self Pickup</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="row mb-2">
+        <div class="col-md-3">
+            <label>Vehicle No</label>
+            <input type="text" name="vehicle_number" class="form-control">
+        </div>
+        <div class="col-md-3">
+            <label>Packing Image</label>
+            <input type="file" name="packing_image" class="form-control">
+        </div>
+        <div class="col-md-3">
+            <label>LR Copy</label>
+            <input type="file" name="lr_copy" class="form-control">
+        </div>
+        <div class="col-md-3">
+            <label>Remarks</label>
+            <input type="text" name="remarks" class="form-control">
+        </div>
+    </div>
+
+    <button class="btn btn-primary">Save Sale</button>
+</form>
+
+<table class="table table-bordered table-sm">
+    <tr>
+        <th>Date</th>
+        <th>Customer</th>
+        <th>Product</th>
+        <th>Qty</th>
+        <th>Dispatch</th>
+        <th>Vehicle</th>
+    </tr>
+
+    {% for r in sales %}
+    <tr>
+        <td>{{ r.date }}</td>
+        <td>{{ r.customer_name }}</td>
+        <td>{{ r.name }} ({{ r.volume }})</td>
+        <td>{{ r.quantity }}</td>
+        <td>{{ r.dispatch_type }}</td>
+        <td>{{ r.vehicle_number }}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+{% endblock %}

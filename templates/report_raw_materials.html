@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Raw Material Report</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<h2>Raw Material Stock Report</h2>
+
+<table border="1" width="100%">
+    <tr>
+        <th>Name</th>
+        <th>Type</th>
+        <th>Unit</th>
+        <th>Current Stock</th>
+    </tr>
+
+    {% for row in data %}
+    <tr>
+        <td>{{ row.name }}</td>
+        <td>{{ row.material_type }}</td>
+        <td>{{ row.unit }}</td>
+        <td>{{ row.current_stock }}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+<br>
+<a href="/reports">Back to Reports</a>
+
+</body>
+</html>
