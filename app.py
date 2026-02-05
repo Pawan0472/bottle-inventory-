@@ -1,28 +1,56 @@
-from flask import Flask, render_template, request, redirect, url_for, session, send_file
-from sqlalchemy import create_engine, text
-from werkzeug.security import generate_password_hash, check_password_hash
+from flask import Flask, render_template, request, redirect, session, send_file
 import os
-from werkzeug.utils import secure_filename
 from functools import wraps
 from datetime import datetime
-import pandas as pd
 import io
+import pandas as pd
+
+from werkzeug.security import generate_password_hash, check_password_hash
+from sqlalchemy import create_engine, text
+
+
+# =========================================================
+# APP CONFIG
+# =========================================================
 
 app = Flask(__name__)
-app.secret_key = "very_secret_key_change_later"
+app.secret_key = os.environ.get("SECRET_KEY", "change_this_secret_key")
 
-# ---------------- DATABASE ----------------
-# ---------------- DATABASE (SUPABASE POSTGRESQL) ----------------
+APP_NAME = "SS Packaging Inventory"
+
+
+# =========================================================
+# DATABASE (SUPABASE POSTGRES)
+# =========================================================
 
 DATABASE_URL = "postgresql://postgres.emuskdnhedzecbjnnrzt:Pawan729266kumar@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres"
 
+# For local testing only, you can hardcode:
+# DATABASE_URL = "PASTE_SUPABASE_URL_HERE"
+
+if not DATABASE_URL:
+    raise RuntimeError("❌ DATABASE_URL missing. Add it in environment variables.")
+
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+
 
 def get_db_connection():
     return engine.connect()
 
 
-# ---------------- LOGIN REQUIRED DECORATOR ----------------
+def fetchone_dict(result):
+    row = result.fetchone()
+    return dict(row._mapping) if row else None
+
+
+def fetchall_dict(result):
+    rows = result.fetchall()
+    return [dict(r._mapping) for r in rows]
+
+
+# =========================================================
+# LOGIN REQUIRED DECORATOR
+# =========================================================
 
 def login_required(role=None):
     def wrapper(f):
@@ -42,25 +70,30 @@ def login_required(role=None):
                         return "Access Denied", 403
 
             return f(*args, **kwargs)
+
         return decorated_function
     return wrapper
 
-# ---------------- LOGIN SYSTEM ----------------
+
+# =========================================================
+# LOGIN / LOGOUT
+# =========================================================
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
     error = None
 
     if request.method == "POST":
-        username = request.form["username"]
-        password = request.form["password"]
+        username = request.form["username"].strip()
+        password = request.form["password"].strip()
 
         conn = get_db_connection()
-        user = conn.execute(
-             text("SELECT * FROM users WHERE username = :username"),
-             {"username": username}
-        ).fetchone()
 
+        result = conn.execute(
+            text("SELECT * FROM users WHERE username = :u AND is_active = true"),
+            {"u": username},
+        )
+        user = fetchone_dict(result)
         conn.close()
 
         if user and check_password_hash(user["password"], password):
@@ -68,71 +101,144 @@ def login():
             session["username"] = user["username"]
             session["role"] = user["role"]
             return redirect("/dashboard")
-        else:
-            error = "Invalid username or password"
 
-    return render_template("login.html", error=error)
+        error = "Invalid username or password"
+
+    return render_template("login.html", error=error, app_name=APP_NAME)
+
 
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect("/login")
 
-# ---------------- ROOT ----------------
 
 @app.route("/")
 def root():
     return redirect("/dashboard")
 
-# ---------------- DASHBOARD ----------------
+
+# =========================================================
+# DASHBOARD
+# =========================================================
 
 @app.route("/dashboard")
 @login_required()
 def dashboard():
     conn = get_db_connection()
 
-    total_products = conn.execute("SELECT COUNT(*) FROM products").fetchone()[0]
-    total_customers = conn.execute("SELECT COUNT(*) FROM customers").fetchone()[0]
-    total_suppliers = conn.execute("SELECT COUNT(*) FROM suppliers").fetchone()[0]
+    total_products = conn.execute(text("SELECT COUNT(*) FROM products")).scalar() or 0
+    total_customers = conn.execute(text("SELECT COUNT(*) FROM customers")).scalar() or 0
+    total_suppliers = conn.execute(text("SELECT COUNT(*) FROM suppliers")).scalar() or 0
 
     today = datetime.now().strftime("%Y-%m-%d")
 
     today_production = conn.execute(
-        "SELECT IFNULL(SUM(quantity_produced), 0) FROM production WHERE date = ?",
-        (today,)
-    ).fetchone()[0]
+        text("SELECT COALESCE(SUM(quantity_produced),0) FROM production WHERE date = :d"),
+        {"d": today},
+    ).scalar() or 0
 
     today_sales = conn.execute(
-        "SELECT IFNULL(SUM(quantity), 0) FROM sales WHERE date = ?",
-        (today,)
-    ).fetchone()[0]
+        text("SELECT COALESCE(SUM(quantity),0) FROM sales WHERE date = :d"),
+        {"d": today},
+    ).scalar() or 0
 
     total_finished_stock = conn.execute(
-        "SELECT IFNULL(SUM(current_stock), 0) FROM product_stock"
-    ).fetchone()[0]
+        text("SELECT COALESCE(SUM(current_stock),0) FROM product_stock")
+    ).scalar() or 0
 
     total_sales_value = conn.execute(
-        "SELECT IFNULL(SUM(quantity), 0) FROM sales"
-    ).fetchone()[0]
+        text("SELECT COALESCE(SUM(quantity),0) FROM sales")
+    ).scalar() or 0
 
     total_purchase_value = conn.execute(
-        "SELECT IFNULL(SUM(quantity * rate), 0) FROM purchase"
-    ).fetchone()[0]
+        text("SELECT COALESCE(SUM(quantity * rate),0) FROM purchase")
+    ).scalar() or 0
 
-    # 🔹 VERY IMPORTANT: SEND EMPTY LISTS FOR CHARTS
-    sales_dates = []
-    sales_qty = []
-    prod_names = []
-    prod_qty = []
-    cust_names = []
-    cust_qty = []
-    supp_names = []
-    supp_qty = []
+    # --- Sales Trend
+    sales_trend_rows = conn.execute(text("""
+        SELECT date, COALESCE(SUM(quantity),0) AS total_qty
+        FROM sales
+        GROUP BY date
+        ORDER BY date DESC
+        LIMIT 7
+    """)).fetchall()
+
+    sales_trend_rows = list(reversed(sales_trend_rows))
+    sales_dates = [str(r[0]) for r in sales_trend_rows]
+    sales_qty = [int(r[1]) for r in sales_trend_rows]
+
+    # --- Production by product
+    prod_rows = conn.execute(text("""
+        SELECT p.name, COALESCE(SUM(pr.quantity_produced),0) AS total_qty
+        FROM production pr
+        LEFT JOIN products p ON pr.product_id = p.id
+        GROUP BY p.name
+        ORDER BY total_qty DESC
+        LIMIT 5
+    """)).fetchall()
+
+    prod_names = [r[0] for r in prod_rows]
+    prod_qty = [int(r[1]) for r in prod_rows]
+
+    # --- Top customers
+    cust_rows = conn.execute(text("""
+        SELECT c.name, COALESCE(SUM(s.quantity),0) AS total_qty
+        FROM sales s
+        LEFT JOIN customers c ON s.customer_id = c.id
+        GROUP BY c.name
+        ORDER BY total_qty DESC
+        LIMIT 5
+    """)).fetchall()
+
+    cust_names = [r[0] for r in cust_rows]
+    cust_qty = [int(r[1]) for r in cust_rows]
+
+    # --- Top suppliers
+    supp_rows = conn.execute(text("""
+        SELECT sp.name, COALESCE(SUM(pu.quantity),0) AS total_qty
+        FROM purchase pu
+        LEFT JOIN suppliers sp ON pu.supplier_id = sp.id
+        GROUP BY sp.name
+        ORDER BY total_qty DESC
+        LIMIT 5
+    """)).fetchall()
+
+    supp_names = [r[0] for r in supp_rows]
+    supp_qty = [float(r[1]) for r in supp_rows]
+
+    # --- Low raw materials
+    low_raw_materials_rows = conn.execute(text("""
+        SELECT name, current_stock, unit
+        FROM raw_materials
+        WHERE current_stock < 50
+        ORDER BY current_stock ASC
+    """)).fetchall()
+
+    low_raw_materials = [
+        {"name": r[0], "current_stock": float(r[1]), "unit": r[2]}
+        for r in low_raw_materials_rows
+    ]
+
+    # --- Low finished products
+    low_finished_rows = conn.execute(text("""
+        SELECT p.name, p.volume, ps.current_stock
+        FROM product_stock ps
+        LEFT JOIN products p ON ps.product_id = p.id
+        WHERE ps.current_stock < 1000
+        ORDER BY ps.current_stock ASC
+    """)).fetchall()
+
+    low_finished_products = [
+        {"name": r[0], "volume": r[1], "current_stock": int(r[2])}
+        for r in low_finished_rows
+    ]
 
     conn.close()
 
     return render_template(
         "dashboard.html",
+        app_name=APP_NAME,
         total_products=total_products,
         total_customers=total_customers,
         total_suppliers=total_suppliers,
@@ -141,8 +247,6 @@ def dashboard():
         total_finished_stock=total_finished_stock,
         total_sales_value=total_sales_value,
         total_purchase_value=total_purchase_value,
-
-        # charts (empty safe defaults)
         sales_dates=sales_dates,
         sales_qty=sales_qty,
         prod_names=prod_names,
@@ -150,14 +254,15 @@ def dashboard():
         cust_names=cust_names,
         cust_qty=cust_qty,
         supp_names=supp_names,
-        supp_qty=supp_qty
+        supp_qty=supp_qty,
+        low_raw_materials=low_raw_materials,
+        low_finished_products=low_finished_products
     )
 
 
-# ---------------- PRODUCTS ----------------
-
-UPLOAD_FOLDER = "static/uploads/products"
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+# =========================================================
+# PRODUCTS
+# =========================================================
 
 @app.route("/products", methods=["GET", "POST"])
 @login_required(role=["admin", "data_entry"])
@@ -165,31 +270,25 @@ def products():
     conn = get_db_connection()
 
     if request.method == "POST":
-        name = request.form["name"]
-        volume = request.form["volume"]
-        preform_weight = request.form["preform_weight"]
-        cap_type = request.form["cap_type"]
-
-        image_file = request.files["image"]
-        image_path = None
-        if image_file and image_file.filename:
-            filename = secure_filename(image_file.filename)
-            path = os.path.join(UPLOAD_FOLDER, filename)
-            image_file.save(path)
-            image_path = path
-
-        conn.execute("""
-            INSERT INTO products (name, volume, preform_weight, cap_type, image_path)
-            VALUES (?, ?, ?, ?, ?)
-        """, (name, volume, preform_weight, cap_type, image_path))
-
+        conn.execute(text("""
+            INSERT INTO products (name, volume, preform_weight, cap_type)
+            VALUES (:n, :v, :pw, :ct)
+        """), {
+            "n": request.form["name"],
+            "v": request.form["volume"],
+            "pw": request.form["preform_weight"],
+            "ct": request.form["cap_type"]
+        })
         conn.commit()
 
-    products = conn.execute("SELECT * FROM products").fetchall()
+    products_list = fetchall_dict(conn.execute(text("SELECT * FROM products ORDER BY id DESC")))
     conn.close()
-    return render_template("products.html", products=products)
+    return render_template("products.html", products=products_list, app_name=APP_NAME)
 
-# ---------------- RAW MATERIALS ----------------
+
+# =========================================================
+# RAW MATERIALS
+# =========================================================
 
 @app.route("/raw-materials", methods=["GET", "POST"])
 @login_required(role=["admin", "data_entry"])
@@ -197,241 +296,297 @@ def raw_materials():
     conn = get_db_connection()
 
     if request.method == "POST":
-        name = request.form["name"]
-        material_type = request.form["material_type"]
-        unit = request.form["unit"]
-        current_stock = float(request.form["current_stock"])
-
-        conn.execute("""
+        conn.execute(text("""
             INSERT INTO raw_materials (name, material_type, unit, current_stock)
-            VALUES (?, ?, ?, ?)
-        """, (name, material_type, unit, current_stock))
-
+            VALUES (:n, :t, :u, :s)
+        """), {
+            "n": request.form["name"],
+            "t": request.form["material_type"],
+            "u": request.form["unit"],
+            "s": request.form["current_stock"]
+        })
         conn.commit()
 
-    materials = conn.execute("SELECT * FROM raw_materials").fetchall()
+    materials = fetchall_dict(conn.execute(text("SELECT * FROM raw_materials ORDER BY id DESC")))
     conn.close()
-    return render_template("raw_materials.html", materials=materials)
+    return render_template("raw_materials.html", materials=materials, app_name=APP_NAME)
 
-# ---------------- BOM ----------------
+
+# =========================================================
+# BOM
+# =========================================================
 
 @app.route("/bom", methods=["GET", "POST"])
 @login_required(role="admin")
 def bom():
     conn = get_db_connection()
-    products = conn.execute("SELECT * FROM products").fetchall()
-    materials = conn.execute("SELECT * FROM raw_materials").fetchall()
+
+    products_list = fetchall_dict(conn.execute(text("SELECT * FROM products ORDER BY name")))
+    materials_list = fetchall_dict(conn.execute(text("SELECT * FROM raw_materials ORDER BY name")))
 
     if request.method == "POST":
-        product_id = request.form["product_id"]
-        raw_material_id = request.form["raw_material_id"]
-        consumption = float(request.form["consumption_per_unit"])
-
-        conn.execute("""
+        conn.execute(text("""
             INSERT INTO bom (product_id, raw_material_id, consumption_per_unit)
-            VALUES (?, ?, ?)
-        """, (product_id, raw_material_id, consumption))
-
+            VALUES (:p, :r, :c)
+        """), {
+            "p": request.form["product_id"],
+            "r": request.form["raw_material_id"],
+            "c": request.form["consumption_per_unit"]
+        })
         conn.commit()
 
-    bom_list = conn.execute("""
-        SELECT bom.id, products.name AS product_name,
-               raw_materials.name AS material_name,
-               raw_materials.unit,
+    bom_list = fetchall_dict(conn.execute(text("""
+        SELECT bom.id,
+               p.name AS product_name,
+               p.volume AS volume,
+               rm.name AS material_name,
+               rm.unit AS unit,
                bom.consumption_per_unit
         FROM bom
-        LEFT JOIN products ON bom.product_id = products.id
-        LEFT JOIN raw_materials ON bom.raw_material_id = raw_materials.id
-    """).fetchall()
+        LEFT JOIN products p ON bom.product_id = p.id
+        LEFT JOIN raw_materials rm ON bom.raw_material_id = rm.id
+        ORDER BY bom.id DESC
+    """)))
 
     conn.close()
-    return render_template("bom.html", products=products, materials=materials, bom_list=bom_list)
+    return render_template("bom.html",
+                           products=products_list,
+                           materials=materials_list,
+                           bom_list=bom_list,
+                           app_name=APP_NAME)
 
-# ---------------- PRODUCTION ----------------
+
+# =========================================================
+# PRODUCTION (BOM LOGIC)
+# =========================================================
 
 @app.route("/production", methods=["GET", "POST"])
 @login_required(role=["admin", "data_entry"])
 def production():
     conn = get_db_connection()
-    products = conn.execute("SELECT * FROM products").fetchall()
+
+    products_list = fetchall_dict(conn.execute(text("SELECT * FROM products ORDER BY name")))
     error = None
 
     if request.method == "POST":
         date = request.form["date"]
-        product_id = request.form["product_id"]
-        quantity = int(request.form["quantity_produced"])
-        rejects = int(request.form["rejects"])
+        product_id = int(request.form["product_id"])
+        qty = int(request.form["quantity_produced"])
+        rejects = int(request.form["rejects"] or 0)
         remarks = request.form["remarks"]
 
-        bom_items = conn.execute("""
-            SELECT bom.raw_material_id, bom.consumption_per_unit, raw_materials.current_stock
+        bom_items = fetchall_dict(conn.execute(text("""
+            SELECT bom.raw_material_id,
+                   bom.consumption_per_unit,
+                   rm.current_stock
             FROM bom
-            LEFT JOIN raw_materials ON bom.raw_material_id = raw_materials.id
-            WHERE bom.product_id = ?
-        """, (product_id,)).fetchall()
+            LEFT JOIN raw_materials rm ON bom.raw_material_id = rm.id
+            WHERE bom.product_id = :pid
+        """), {"pid": product_id}))
 
         if not bom_items:
             error = "No BOM defined for this product!"
         else:
+            # Check stock
             for item in bom_items:
-                required = quantity * float(item["consumption_per_unit"])
-                if item["current_stock"] < required:
-                    error = "Not enough raw material stock!"
+                required = qty * float(item["consumption_per_unit"])
+                if float(item["current_stock"]) < required:
+                    error = f"Not enough raw material stock!"
                     break
 
         if not error:
-            conn.execute("""
+            # Insert production
+            conn.execute(text("""
                 INSERT INTO production (date, product_id, quantity_produced, rejects, remarks)
-                VALUES (?, ?, ?, ?, ?)
-            """, (date, product_id, quantity, rejects, remarks))
+                VALUES (:d, :pid, :q, :r, :rm)
+            """), {"d": date, "pid": product_id, "q": qty, "r": rejects, "rm": remarks})
 
-            current = conn.execute(
-                "SELECT current_stock FROM product_stock WHERE product_id = ?",
-                (product_id,)
-            ).fetchone()
+            # Increase finished stock
+            current = conn.execute(text("""
+                SELECT current_stock FROM product_stock WHERE product_id = :pid
+            """), {"pid": product_id}).fetchone()
 
             if current:
-                conn.execute(
-                    "UPDATE product_stock SET current_stock = ? WHERE product_id = ?",
-                    (current["current_stock"] + quantity, product_id)
-                )
+                conn.execute(text("""
+                    UPDATE product_stock
+                    SET current_stock = current_stock + :q
+                    WHERE product_id = :pid
+                """), {"q": qty, "pid": product_id})
             else:
-                conn.execute(
-                    "INSERT INTO product_stock (product_id, current_stock) VALUES (?, ?)",
-                    (product_id, quantity)
-                )
+                conn.execute(text("""
+                    INSERT INTO product_stock (product_id, current_stock)
+                    VALUES (:pid, :q)
+                """), {"pid": product_id, "q": qty})
 
+            # Reduce raw materials
             for item in bom_items:
-                required = quantity * float(item["consumption_per_unit"])
-                new_stock = item["current_stock"] - required
-                conn.execute(
-                    "UPDATE raw_materials SET current_stock = ? WHERE id = ?",
-                    (new_stock, item["raw_material_id"])
-                )
+                required = qty * float(item["consumption_per_unit"])
+                conn.execute(text("""
+                    UPDATE raw_materials
+                    SET current_stock = current_stock - :req
+                    WHERE id = :rid
+                """), {"req": required, "rid": item["raw_material_id"]})
 
             conn.commit()
 
-    production_list = conn.execute("""
-        SELECT production.*, products.name AS product_name
-        FROM production
-        LEFT JOIN products ON production.product_id = products.id
-        ORDER BY production.id DESC
-    """).fetchall()
+    production_list = fetchall_dict(conn.execute(text("""
+        SELECT pr.*, p.name AS product_name, p.volume
+        FROM production pr
+        LEFT JOIN products p ON pr.product_id = p.id
+        ORDER BY pr.id DESC
+    """)))
 
     conn.close()
-    return render_template("production.html", products=products, production_list=production_list, error=error)
+    return render_template("production.html",
+                           products=products_list,
+                           production_list=production_list,
+                           error=error,
+                           app_name=APP_NAME)
 
-# ---------------- PURCHASE ----------------
+
+# =========================================================
+# PURCHASE
+# =========================================================
 
 @app.route("/purchase", methods=["GET", "POST"])
 @login_required(role=["admin", "data_entry"])
 def purchase():
     conn = get_db_connection()
-    suppliers = conn.execute("SELECT * FROM suppliers").fetchall()
-    raw_materials = conn.execute("SELECT * FROM raw_materials").fetchall()
+
+    suppliers_list = fetchall_dict(conn.execute(text("SELECT * FROM suppliers ORDER BY name")))
+    raw_materials_list = fetchall_dict(conn.execute(text("SELECT * FROM raw_materials ORDER BY name")))
 
     if request.method == "POST":
-        date = request.form["date"]
-        supplier_id = request.form["supplier_id"]
-        raw_material_id = request.form["raw_material_id"]
-        quantity = float(request.form["quantity"])
-        rate = float(request.form["rate"])
-        bill_number = request.form["bill_number"]
-        remarks = request.form["remarks"]
-
-        conn.execute("""
+        conn.execute(text("""
             INSERT INTO purchase (date, supplier_id, raw_material_id, quantity, rate, bill_number, remarks)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (date, supplier_id, raw_material_id, quantity, rate, bill_number, remarks))
+            VALUES (:d, :sid, :rid, :q, :r, :bn, :rm)
+        """), {
+            "d": request.form["date"],
+            "sid": request.form["supplier_id"],
+            "rid": request.form["raw_material_id"],
+            "q": request.form["quantity"],
+            "r": request.form["rate"],
+            "bn": request.form["bill_number"],
+            "rm": request.form["remarks"]
+        })
 
-        current = conn.execute(
-            "SELECT current_stock FROM raw_materials WHERE id = ?",
-            (raw_material_id,)
-        ).fetchone()
-
-        conn.execute(
-            "UPDATE raw_materials SET current_stock = ? WHERE id = ?",
-            (current["current_stock"] + quantity, raw_material_id)
-        )
+        # Add stock
+        conn.execute(text("""
+            UPDATE raw_materials
+            SET current_stock = current_stock + :q
+            WHERE id = :rid
+        """), {"q": request.form["quantity"], "rid": request.form["raw_material_id"]})
 
         conn.commit()
 
-    purchase_list = conn.execute("""
-        SELECT purchase.*, suppliers.name AS supplier_name, raw_materials.name AS material_name
-        FROM purchase
-        LEFT JOIN suppliers ON purchase.supplier_id = suppliers.id
-        LEFT JOIN raw_materials ON purchase.raw_material_id = raw_materials.id
-        ORDER BY purchase.id DESC
-    """).fetchall()
+    purchase_list = fetchall_dict(conn.execute(text("""
+        SELECT pu.*, sp.name AS supplier_name, rm.name AS material_name, rm.unit
+        FROM purchase pu
+        LEFT JOIN suppliers sp ON pu.supplier_id = sp.id
+        LEFT JOIN raw_materials rm ON pu.raw_material_id = rm.id
+        ORDER BY pu.id DESC
+    """)))
 
     conn.close()
-    return render_template("purchase.html", suppliers=suppliers, raw_materials=raw_materials, purchase_list=purchase_list)
+    return render_template("purchase.html",
+                           suppliers=suppliers_list,
+                           raw_materials=raw_materials_list,
+                           purchase_list=purchase_list,
+                           app_name=APP_NAME)
 
-# ---------------- SALES ----------------
+
+# =========================================================
+# SALES
+# =========================================================
 
 @app.route("/sales", methods=["GET", "POST"])
 @login_required(role=["admin", "data_entry"])
 def sales():
     conn = get_db_connection()
-    customers = conn.execute("SELECT * FROM customers").fetchall()
-    products = conn.execute("SELECT * FROM products").fetchall()
+
+    customers_list = fetchall_dict(conn.execute(text("SELECT * FROM customers ORDER BY name")))
+    products_list = fetchall_dict(conn.execute(text("SELECT * FROM products ORDER BY name")))
+
     error = None
 
     if request.method == "POST":
         date = request.form["date"]
-        customer_id = request.form["customer_id"]
-        product_id = request.form["product_id"]
-        quantity = int(request.form["quantity"])
+        customer_id = int(request.form["customer_id"])
+        product_id = int(request.form["product_id"])
+        qty = int(request.form["quantity"])
         dispatch_type = request.form["dispatch_type"]
         vehicle_number = request.form["vehicle_number"]
         remarks = request.form["remarks"]
 
-        current = conn.execute(
-            "SELECT current_stock FROM product_stock WHERE product_id = ?",
-            (product_id,)
-        ).fetchone()
+        current = conn.execute(text("""
+            SELECT current_stock FROM product_stock WHERE product_id = :pid
+        """), {"pid": product_id}).fetchone()
 
-        if not current or current["current_stock"] < quantity:
+        if not current or int(current[0]) < qty:
             error = "Not enough finished stock!"
         else:
-            conn.execute("""
+            conn.execute(text("""
                 INSERT INTO sales (date, customer_id, product_id, quantity, dispatch_type, vehicle_number, remarks)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (date, customer_id, product_id, quantity, dispatch_type, vehicle_number, remarks))
+                VALUES (:d, :cid, :pid, :q, :dt, :vn, :rm)
+            """), {
+                "d": date,
+                "cid": customer_id,
+                "pid": product_id,
+                "q": qty,
+                "dt": dispatch_type,
+                "vn": vehicle_number,
+                "rm": remarks
+            })
 
-            conn.execute(
-                "UPDATE product_stock SET current_stock = ? WHERE product_id = ?",
-                (current["current_stock"] - quantity, product_id)
-            )
+            conn.execute(text("""
+                UPDATE product_stock
+                SET current_stock = current_stock - :q
+                WHERE product_id = :pid
+            """), {"q": qty, "pid": product_id})
 
             conn.commit()
 
-    sales_list = conn.execute("""
-        SELECT sales.*, customers.name AS customer_name, products.name
-        FROM sales
-        LEFT JOIN customers ON sales.customer_id = customers.id
-        LEFT JOIN products ON sales.product_id = products.id
-        ORDER BY sales.id DESC
-    """).fetchall()
+    sales_list = fetchall_dict(conn.execute(text("""
+        SELECT s.*, c.name AS customer_name,
+               p.name AS product_name, p.volume
+        FROM sales s
+        LEFT JOIN customers c ON s.customer_id = c.id
+        LEFT JOIN products p ON s.product_id = p.id
+        ORDER BY s.id DESC
+    """)))
 
     conn.close()
-    return render_template("sales.html", customers=customers, products=products, sales=sales_list, error=error)
+    return render_template("sales.html",
+                           customers=customers_list,
+                           products=products_list,
+                           sales=sales_list,
+                           error=error,
+                           app_name=APP_NAME)
 
-# ---------------- STOCK ----------------
+
+# =========================================================
+# STOCK
+# =========================================================
 
 @app.route("/stock")
 @login_required()
 def stock():
     conn = get_db_connection()
-    stock_list = conn.execute("""
-        SELECT products.name, product_stock.current_stock
-        FROM product_stock
-        LEFT JOIN products ON product_stock.product_id = products.id
-    """).fetchall()
-    conn.close()
-    return render_template("stock.html", stock_list=stock_list)
 
-# ---------------- CUSTOMERS ----------------
+    stock_list = fetchall_dict(conn.execute(text("""
+        SELECT p.name, p.volume, ps.current_stock
+        FROM product_stock ps
+        LEFT JOIN products p ON ps.product_id = p.id
+        ORDER BY p.name
+    """)))
+
+    conn.close()
+    return render_template("stock.html", stock_list=stock_list, app_name=APP_NAME)
+
+
+# =========================================================
+# CUSTOMERS
+# =========================================================
 
 @app.route("/customers", methods=["GET", "POST"])
 @login_required(role=["admin", "data_entry"])
@@ -439,22 +594,24 @@ def customers():
     conn = get_db_connection()
 
     if request.method == "POST":
-        name = request.form["name"]
-        phone = request.form["phone"]
-        address = request.form["address"]
-
-        conn.execute("""
+        conn.execute(text("""
             INSERT INTO customers (name, phone, address)
-            VALUES (?, ?, ?)
-        """, (name, phone, address))
-
+            VALUES (:n, :p, :a)
+        """), {
+            "n": request.form["name"],
+            "p": request.form["phone"],
+            "a": request.form["address"]
+        })
         conn.commit()
 
-    customers = conn.execute("SELECT * FROM customers").fetchall()
+    customers_list = fetchall_dict(conn.execute(text("SELECT * FROM customers ORDER BY id DESC")))
     conn.close()
-    return render_template("customers.html", customers=customers)
+    return render_template("customers.html", customers=customers_list, app_name=APP_NAME)
 
-# ---------------- SUPPLIERS ----------------
+
+# =========================================================
+# SUPPLIERS
+# =========================================================
 
 @app.route("/suppliers", methods=["GET", "POST"])
 @login_required(role=["admin", "data_entry"])
@@ -462,22 +619,24 @@ def suppliers():
     conn = get_db_connection()
 
     if request.method == "POST":
-        name = request.form["name"]
-        phone = request.form["phone"]
-        address = request.form["address"]
-
-        conn.execute("""
+        conn.execute(text("""
             INSERT INTO suppliers (name, phone, address)
-            VALUES (?, ?, ?)
-        """, (name, phone, address))
-
+            VALUES (:n, :p, :a)
+        """), {
+            "n": request.form["name"],
+            "p": request.form["phone"],
+            "a": request.form["address"]
+        })
         conn.commit()
 
-    suppliers = conn.execute("SELECT * FROM suppliers").fetchall()
+    suppliers_list = fetchall_dict(conn.execute(text("SELECT * FROM suppliers ORDER BY id DESC")))
     conn.close()
-    return render_template("suppliers.html", suppliers=suppliers)
+    return render_template("suppliers.html", suppliers=suppliers_list, app_name=APP_NAME)
 
-# ---------------- USER MANAGEMENT ----------------
+
+# =========================================================
+# USERS (ROLE MANAGEMENT)
+# =========================================================
 
 @app.route("/users", methods=["GET", "POST"])
 @login_required(role="admin")
@@ -486,90 +645,182 @@ def users():
     error = None
 
     if request.method == "POST":
-        username = request.form["username"]
-        password = request.form["password"]
+        username = request.form["username"].strip()
+        password = request.form["password"].strip()
         role = request.form["role"]
 
-        hashed = generate_password_hash(password)
-
         try:
-            conn.execute("""
+            hashed = generate_password_hash(password)
+
+            conn.execute(text("""
                 INSERT INTO users (username, password, role, is_active)
-                VALUES (?, ?, ?, 1)
-            """, (username, hashed, role))
+                VALUES (:u, :p, :r, true)
+            """), {"u": username, "p": hashed, "r": role})
+
             conn.commit()
         except:
             error = "Username already exists"
 
-    users = conn.execute("""
+    users_list = fetchall_dict(conn.execute(text("""
         SELECT id, username, role, is_active
         FROM users
         ORDER BY id
-    """).fetchall()
+    """)))
 
     conn.close()
-    return render_template("users.html", users=users, error=error)
+    return render_template("users.html", users=users_list, error=error, app_name=APP_NAME)
 
-@app.route("/users/delete/<int:user_id>")
+
+@app.route("/users/toggle/<int:user_id>")
 @login_required(role="admin")
-def delete_user(user_id):
+def toggle_user(user_id):
     if user_id == session.get("user_id"):
-        return "You cannot delete your own account", 400
+        return "You cannot disable your own account", 400
 
     conn = get_db_connection()
-    conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+    conn.execute(text("""
+        UPDATE users
+        SET is_active = NOT is_active
+        WHERE id = :id
+    """), {"id": user_id})
     conn.commit()
     conn.close()
     return redirect("/users")
+
 
 @app.route("/users/reset_password/<int:user_id>", methods=["POST"])
 @login_required(role="admin")
 def reset_user_password(user_id):
-    new_password = request.form["new_password"]
-
-    conn = get_db_connection()
+    new_password = request.form["new_password"].strip()
     hashed = generate_password_hash(new_password)
 
-    conn.execute(
-        "UPDATE users SET password = ? WHERE id = ?",
-        (hashed, user_id)
-    )
-
+    conn = get_db_connection()
+    conn.execute(text("""
+        UPDATE users
+        SET password = :p
+        WHERE id = :id
+    """), {"p": hashed, "id": user_id})
     conn.commit()
     conn.close()
     return redirect("/users")
 
-# ---------------- REPORTS ----------------
+
+# =========================================================
+# REPORTS + EXPORT
+# =========================================================
 
 @app.route("/reports")
 @login_required()
 def reports():
-    return render_template("reports.html")
+    return render_template("reports.html", app_name=APP_NAME)
+
 
 @app.route("/reports/stock")
 @login_required()
-def stock_report():
+def report_stock():
     conn = get_db_connection()
-    stock_list = conn.execute("""
-        SELECT products.name, product_stock.current_stock
-        FROM product_stock
-        LEFT JOIN products ON product_stock.product_id = products.id
-    """).fetchall()
+    stock_list = fetchall_dict(conn.execute(text("""
+        SELECT p.name, p.volume, ps.current_stock
+        FROM product_stock ps
+        LEFT JOIN products p ON ps.product_id = p.id
+        ORDER BY p.name
+    """)))
     conn.close()
-    return render_template("report_stock.html", stock_list=stock_list)
+    return render_template("report_stock.html", stock_list=stock_list, app_name=APP_NAME)
+
+
+@app.route("/reports/raw-materials")
+@login_required()
+def report_raw_materials():
+    conn = get_db_connection()
+    materials = fetchall_dict(conn.execute(text("""
+        SELECT * FROM raw_materials ORDER BY name
+    """)))
+    conn.close()
+    return render_template("report_raw_materials.html", materials=materials, app_name=APP_NAME)
+
+
+@app.route("/reports/production")
+@login_required()
+def report_production():
+    conn = get_db_connection()
+    production_list = fetchall_dict(conn.execute(text("""
+        SELECT pr.*, p.name AS product_name, p.volume
+        FROM production pr
+        LEFT JOIN products p ON pr.product_id = p.id
+        ORDER BY pr.id DESC
+    """)))
+    conn.close()
+    return render_template("report_production.html", production_list=production_list, app_name=APP_NAME)
+
+
+@app.route("/reports/sales", methods=["GET", "POST"])
+@login_required()
+def report_sales():
+    conn = get_db_connection()
+    sales_list = []
+
+    if request.method == "POST":
+        from_date = request.form["from_date"]
+        to_date = request.form["to_date"]
+
+        sales_list = fetchall_dict(conn.execute(text("""
+            SELECT s.date, c.name AS customer_name,
+                   p.name AS product_name, p.volume,
+                   s.quantity
+            FROM sales s
+            LEFT JOIN customers c ON s.customer_id = c.id
+            LEFT JOIN products p ON s.product_id = p.id
+            WHERE s.date BETWEEN :f AND :t
+            ORDER BY s.date
+        """), {"f": from_date, "t": to_date}))
+
+    conn.close()
+    return render_template("report_sales.html", sales_list=sales_list, app_name=APP_NAME)
+
+
+@app.route("/reports/purchase", methods=["GET", "POST"])
+@login_required()
+def report_purchase():
+    conn = get_db_connection()
+    purchase_list = []
+
+    if request.method == "POST":
+        from_date = request.form["from_date"]
+        to_date = request.form["to_date"]
+
+        purchase_list = fetchall_dict(conn.execute(text("""
+            SELECT pu.date, sp.name AS supplier_name,
+                   rm.name AS material_name,
+                   pu.quantity, pu.rate
+            FROM purchase pu
+            LEFT JOIN suppliers sp ON pu.supplier_id = sp.id
+            LEFT JOIN raw_materials rm ON pu.raw_material_id = rm.id
+            WHERE pu.date BETWEEN :f AND :t
+            ORDER BY pu.date
+        """), {"f": from_date, "t": to_date}))
+
+    conn.close()
+    return render_template("report_purchase.html", purchase_list=purchase_list, app_name=APP_NAME)
+
+
+# =========================================================
+# EXPORT TO EXCEL (Stock)
+# =========================================================
 
 @app.route("/reports/stock/export")
 @login_required()
 def export_stock_excel():
     conn = get_db_connection()
-    stock_list = conn.execute("""
-        SELECT products.name, product_stock.current_stock
-        FROM product_stock
-        LEFT JOIN products ON product_stock.product_id = products.id
-    """).fetchall()
+    rows = conn.execute(text("""
+        SELECT p.name AS product, p.volume AS volume, ps.current_stock AS stock
+        FROM product_stock ps
+        LEFT JOIN products p ON ps.product_id = p.id
+        ORDER BY p.name
+    """)).fetchall()
     conn.close()
 
-    df = pd.DataFrame(stock_list, columns=["Product", "Current Stock"])
+    df = pd.DataFrame(rows, columns=["Product", "Volume", "Current Stock"])
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
         df.to_excel(writer, index=False)
@@ -577,7 +828,10 @@ def export_stock_excel():
     output.seek(0)
     return send_file(output, as_attachment=True, download_name="stock_report.xlsx")
 
-# ---------------- RUN ----------------
+
+# =========================================================
+# RUN
+# =========================================================
 
 if __name__ == "__main__":
     app.run(debug=True)

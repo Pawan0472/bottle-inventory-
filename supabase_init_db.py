@@ -1,15 +1,21 @@
 from sqlalchemy import create_engine, text
 from werkzeug.security import generate_password_hash
+import os
 
-# 🔥 Paste your Supabase Postgres URL here
+# OPTION 1 (Recommended): use environment variable
 DATABASE_URL = "postgresql://postgres.emuskdnhedzecbjnnrzt:Pawan729266kumar@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres"
+
+# OPTION 2: hardcode (only for local testing)
+# DATABASE_URL = "PASTE_SUPABASE_URL_HERE"
+
+if not DATABASE_URL:
+    raise RuntimeError("❌ DATABASE_URL missing. Set it in environment or paste it in file.")
 
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 
 def init_db():
     with engine.begin() as conn:
 
-        # ---------------- USERS ----------------
         conn.execute(text("""
         CREATE TABLE IF NOT EXISTS users (
             id SERIAL PRIMARY KEY,
@@ -20,7 +26,6 @@ def init_db():
         );
         """))
 
-        # ---------------- PRODUCTS ----------------
         conn.execute(text("""
         CREATE TABLE IF NOT EXISTS products (
             id SERIAL PRIMARY KEY,
@@ -32,7 +37,6 @@ def init_db():
         );
         """))
 
-        # ---------------- RAW MATERIALS ----------------
         conn.execute(text("""
         CREATE TABLE IF NOT EXISTS raw_materials (
             id SERIAL PRIMARY KEY,
@@ -43,7 +47,6 @@ def init_db():
         );
         """))
 
-        # ---------------- BOM ----------------
         conn.execute(text("""
         CREATE TABLE IF NOT EXISTS bom (
             id SERIAL PRIMARY KEY,
@@ -53,7 +56,6 @@ def init_db():
         );
         """))
 
-        # ---------------- PRODUCTION ----------------
         conn.execute(text("""
         CREATE TABLE IF NOT EXISTS production (
             id SERIAL PRIMARY KEY,
@@ -65,7 +67,6 @@ def init_db():
         );
         """))
 
-        # ---------------- PRODUCT STOCK ----------------
         conn.execute(text("""
         CREATE TABLE IF NOT EXISTS product_stock (
             id SERIAL PRIMARY KEY,
@@ -74,7 +75,6 @@ def init_db():
         );
         """))
 
-        # ---------------- CUSTOMERS ----------------
         conn.execute(text("""
         CREATE TABLE IF NOT EXISTS customers (
             id SERIAL PRIMARY KEY,
@@ -84,7 +84,6 @@ def init_db():
         );
         """))
 
-        # ---------------- SUPPLIERS ----------------
         conn.execute(text("""
         CREATE TABLE IF NOT EXISTS suppliers (
             id SERIAL PRIMARY KEY,
@@ -94,7 +93,6 @@ def init_db():
         );
         """))
 
-        # ---------------- SALES ----------------
         conn.execute(text("""
         CREATE TABLE IF NOT EXISTS sales (
             id SERIAL PRIMARY KEY,
@@ -108,7 +106,6 @@ def init_db():
         );
         """))
 
-        # ---------------- PURCHASE ----------------
         conn.execute(text("""
         CREATE TABLE IF NOT EXISTS purchase (
             id SERIAL PRIMARY KEY,
@@ -122,23 +119,20 @@ def init_db():
         );
         """))
 
-        # ---------------- CREATE DEFAULT ADMIN (IF NOT EXISTS) ----------------
-        admin = conn.execute(text("""
-            SELECT id FROM users WHERE username = 'admin'
-        """)).fetchone()
+        # Default admin
+        admin = conn.execute(text("SELECT id FROM users WHERE username='admin'")).fetchone()
 
         if not admin:
             hashed = generate_password_hash("admin123")
             conn.execute(text("""
                 INSERT INTO users (username, password, role, is_active)
-                VALUES (:u, :p, :r, TRUE)
-            """), {"u": "admin", "p": hashed, "r": "admin"})
-
+                VALUES ('admin', :p, 'admin', true)
+            """), {"p": hashed})
             print("✅ Default admin created: admin / admin123")
         else:
-            print("ℹ️ Admin already exists, skipped.")
+            print("ℹ️ Admin already exists")
 
-    print("✅ All tables created successfully in Supabase!")
+    print("✅ Supabase DB ready!")
 
 if __name__ == "__main__":
     init_db()
