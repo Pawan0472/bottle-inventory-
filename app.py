@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, session, send_file
-import sqlite3
+from sqlalchemy import create_engine, text
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
 from werkzeug.utils import secure_filename
@@ -12,13 +12,14 @@ app = Flask(__name__)
 app.secret_key = "very_secret_key_change_later"
 
 # ---------------- DATABASE ----------------
+# ---------------- DATABASE (SUPABASE POSTGRESQL) ----------------
+
+DATABASE_URL = "postgresql://postgres.emuskdnhedzecbjnnrzt:Pawan729266kumar@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres"
+
+engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 
 def get_db_connection():
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    db_path = os.path.join(base_dir, "inventory.db")
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    return conn
+    return engine.connect()
 
 
 # ---------------- LOGIN REQUIRED DECORATOR ----------------
@@ -56,9 +57,10 @@ def login():
 
         conn = get_db_connection()
         user = conn.execute(
-            "SELECT * FROM users WHERE username = ? AND is_active = 1",
-            (username,)
+             text("SELECT * FROM users WHERE username = :username"),
+             {"username": username}
         ).fetchone()
+
         conn.close()
 
         if user and check_password_hash(user["password"], password):
