@@ -13,7 +13,6 @@
         :root {
             --bg: #0f172a;
             --panel: #020617;
-            --panel2: #0b1220;
             --border: #1e293b;
             --border2: #334155;
             --text: #e5e7eb;
@@ -65,10 +64,11 @@
             font-size: 15px;
             font-weight: 600;
             border-left: 4px solid transparent;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
         }
 
         .sidebar a:hover {
-            background: #0b1220;
+            background: rgba(255,255,255,0.03);
             color: white;
             border-left: 4px solid var(--accent);
         }
@@ -130,11 +130,11 @@
             color: var(--muted);
         }
 
-        /* ===== Inputs (High Contrast) ===== */
+        /* ===== Inputs (keep your dark look) ===== */
         input, select, textarea {
             background: #0b1220 !important;
             color: var(--text) !important;
-            border: 2px solid #475569 !important;
+            border: 2px solid rgba(255,255,255,0.18) !important;
             padding: 9px !important;
             font-size: 15px !important;
         }
@@ -143,9 +143,13 @@
             color: #64748b !important;
         }
 
+        input:hover, select:hover, textarea:hover {
+            border-color: rgba(56, 189, 248, 0.65) !important;
+        }
+
         input:focus, select:focus, textarea:focus {
             outline: none !important;
-            border-color: var(--accent) !important;
+            border-color: rgba(56, 189, 248, 0.95) !important;
             box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15) !important;
         }
 
@@ -154,10 +158,14 @@
             background: var(--btn) !important;
             border: none !important;
             font-weight: 700 !important;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.30);
+            transition: transform 0.12s ease-in-out, box-shadow 0.12s ease-in-out;
         }
 
         .btn-primary:hover {
             background: var(--btnHover) !important;
+            transform: translateY(-1px);
+            box-shadow: 0 10px 24px rgba(0,0,0,0.40);
         }
 
         .btn-outline-danger {
@@ -171,16 +179,37 @@
             color: white !important;
         }
 
-        /* ===== Cards ===== */
-        .card, .table, .alert {
-            background: var(--panel) !important;
-            color: var(--text) !important;
-            border: 2px solid var(--border) !important;
+        /* ===== Cards / Tables clarity ===== */
+        .card, .alert, .table-responsive {
+            border: 1px solid rgba(255,255,255,0.12) !important;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+            background: rgba(2, 6, 23, 0.90) !important;
+        }
+
+        .table {
+            border-radius: 10px;
+            overflow: hidden;
         }
 
         .table th, .table td {
             color: var(--text) !important;
-            border-color: var(--border) !important;
+            border-color: rgba(255,255,255,0.12) !important;
+        }
+
+        .table thead th {
+            border-bottom: 2px solid rgba(255,255,255,0.20) !important;
+            font-weight: 800 !important;
+            letter-spacing: 0.3px;
+        }
+
+        .table tbody tr:hover {
+            background: rgba(255,255,255,0.04) !important;
+        }
+
+        /* ===== Helper panel alert clarity ===== */
+        .helper-panel .alert {
+            border: 1px solid rgba(255,255,255,0.15) !important;
+            box-shadow: 0 6px 16px rgba(0,0,0,0.30);
         }
 
         /* ===== Responsive ===== */
@@ -268,8 +297,7 @@
                 - Click-to-fill inputs<br>
             </div>
         </div>
-    </div>
-
+    </div>     
 </div>
 
 </body>
