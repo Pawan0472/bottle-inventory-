@@ -10,23 +10,10 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
 
     <style>
-        :root {
-            --bg: #0f172a;
-            --panel: #020617;
-            --border: #1e293b;
-            --border2: #334155;
-            --text: #e5e7eb;
-            --muted: #94a3b8;
-            --accent: #38bdf8;
-            --btn: #2563eb;
-            --btnHover: #1d4ed8;
-            --danger: #ef4444;
-        }
-
         body {
             margin: 0;
-            background: var(--bg);
-            color: var(--text);
+            background-color: #f4f6f9;
+            color: #111827;
             font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
         }
 
@@ -40,9 +27,10 @@
 
         /* ===== Sidebar ===== */
         .sidebar {
-            background: var(--panel);
-            border-right: 2px solid var(--border);
+            width: 240px;
             height: 100vh;
+            background-color: #1f2933;
+            color: white;
             position: sticky;
             top: 0;
             overflow-y: auto;
@@ -53,7 +41,7 @@
             font-weight: 800;
             padding: 18px 16px;
             margin: 0;
-            border-bottom: 1px solid var(--border2);
+            border-bottom: 1px solid rgba(255,255,255,0.12);
         }
 
         .sidebar a {
@@ -64,16 +52,16 @@
             font-size: 15px;
             font-weight: 600;
             border-left: 4px solid transparent;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
+            border-bottom: 1px solid rgba(255,255,255,0.06);
         }
 
         .sidebar a:hover {
-            background: rgba(255,255,255,0.03);
+            background-color: #374151;
             color: white;
-            border-left: 4px solid var(--accent);
+            border-left: 4px solid #60a5fa;
         }
 
-        /* ===== Main Content ===== */
+        /* ===== Main ===== */
         .main {
             height: 100vh;
             overflow: hidden;
@@ -84,9 +72,9 @@
         /* ===== Topbar ===== */
         .topbar {
             height: 60px;
-            background: var(--panel);
-            border-bottom: 2px solid var(--border);
-            padding: 10px 18px;
+            background-color: white;
+            border-bottom: 1px solid #d1d5db;
+            padding: 10px 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -94,6 +82,7 @@
 
         .topbar strong {
             font-size: 15px;
+            font-weight: 700;
         }
 
         /* ===== Page Content ===== */
@@ -105,12 +94,12 @@
 
         /* ===== Helper Panel ===== */
         .helper-panel {
-            background: var(--panel);
-            border-left: 2px solid var(--border);
             height: 100vh;
             position: sticky;
             top: 0;
             overflow-y: auto;
+            background: #ffffff;
+            border-left: 1px solid #d1d5db;
             padding: 12px;
         }
 
@@ -118,7 +107,7 @@
             font-size: 16px;
             font-weight: 800;
             padding: 10px 10px 12px 10px;
-            border-bottom: 1px solid var(--border2);
+            border-bottom: 1px solid #e5e7eb;
         }
 
         .helper-body {
@@ -127,89 +116,64 @@
         }
 
         .muted {
-            color: var(--muted);
+            color: #6b7280;
         }
 
-        /* ===== Inputs (keep your dark look) ===== */
+        /* ===== Inputs (borders + focus) ===== */
         input, select, textarea {
-            background: #0b1220 !important;
-            color: var(--text) !important;
-            border: 2px solid rgba(255,255,255,0.18) !important;
-            padding: 9px !important;
+            border: 2px solid #cbd5e1 !important;
+            border-radius: 8px !important;
+            padding: 10px !important;
             font-size: 15px !important;
-        }
-
-        input::placeholder, textarea::placeholder {
-            color: #64748b !important;
-        }
-
-        input:hover, select:hover, textarea:hover {
-            border-color: rgba(56, 189, 248, 0.65) !important;
         }
 
         input:focus, select:focus, textarea:focus {
             outline: none !important;
-            border-color: rgba(56, 189, 248, 0.95) !important;
-            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15) !important;
+            border-color: #2563eb !important;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12) !important;
         }
 
         /* ===== Buttons ===== */
-        .btn-primary {
-            background: var(--btn) !important;
-            border: none !important;
+        button, .btn {
+            border-radius: 8px !important;
             font-weight: 700 !important;
-            box-shadow: 0 6px 18px rgba(0,0,0,0.30);
+            box-shadow: 0 6px 18px rgba(0,0,0,0.10);
             transition: transform 0.12s ease-in-out, box-shadow 0.12s ease-in-out;
         }
 
-        .btn-primary:hover {
-            background: var(--btnHover) !important;
+        button:hover, .btn:hover {
             transform: translateY(-1px);
-            box-shadow: 0 10px 24px rgba(0,0,0,0.40);
+            box-shadow: 0 10px 24px rgba(0,0,0,0.14);
         }
 
-        .btn-outline-danger {
-            border: 2px solid var(--danger) !important;
-            color: var(--danger) !important;
-            font-weight: 700 !important;
-        }
-
-        .btn-outline-danger:hover {
-            background: var(--danger) !important;
-            color: white !important;
-        }
-
-        /* ===== Cards / Tables clarity ===== */
+        /* ===== Cards / Blocks ===== */
         .card, .alert, .table-responsive {
-            border: 1px solid rgba(255,255,255,0.12) !important;
-            box-shadow: 0 4px 14px rgba(0,0,0,0.25);
-            background: rgba(2, 6, 23, 0.90) !important;
+            border: 1px solid #d1d5db !important;
+            border-radius: 12px !important;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.08);
         }
 
+        /* ===== Tables ===== */
         .table {
-            border-radius: 10px;
+            background: white !important;
+            border-radius: 12px;
             overflow: hidden;
         }
 
-        .table th, .table td {
-            color: var(--text) !important;
-            border-color: rgba(255,255,255,0.12) !important;
+        .table th {
+            background: #f3f4f6 !important;
+            color: #111827 !important;
+            font-weight: 800 !important;
+            border-bottom: 2px solid #d1d5db !important;
         }
 
-        .table thead th {
-            border-bottom: 2px solid rgba(255,255,255,0.20) !important;
-            font-weight: 800 !important;
-            letter-spacing: 0.3px;
+        .table td {
+            color: #111827 !important;
+            border-color: #e5e7eb !important;
         }
 
         .table tbody tr:hover {
-            background: rgba(255,255,255,0.04) !important;
-        }
-
-        /* ===== Helper panel alert clarity ===== */
-        .helper-panel .alert {
-            border: 1px solid rgba(255,255,255,0.15) !important;
-            box-shadow: 0 6px 16px rgba(0,0,0,0.30);
+            background: #f9fafb !important;
         }
 
         /* ===== Responsive ===== */
@@ -297,7 +261,8 @@
                 - Click-to-fill inputs<br>
             </div>
         </div>
-    </div>     
+    </div>
+
 </div>
 
 </body>
