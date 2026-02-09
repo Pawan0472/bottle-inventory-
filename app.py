@@ -23,7 +23,7 @@ APP_NAME = "SS Packaging Inventory"
 # DATABASE (SUPABASE POSTGRES)
 # =========================================================
 
-DATABASE_URL = "postgresql://postgres.emuskdnhedzecbjnnrzt:Pawan729266kumar@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres"
+DATABASE_URL = "postgresql://postgres.emuskdnhedzecbjnnrzt:Ilika20252026@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres"
 
 # For local testing only, you can hardcode:
 # DATABASE_URL = "PASTE_SUPABASE_URL_HERE"
