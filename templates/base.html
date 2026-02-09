@@ -205,21 +205,54 @@
     <div class="sidebar">
         <h4>SS Packaging Inventory</h4>
 
-        <a href="/dashboard"><i class="bi bi-speedometer2"></i> Dashboard</a>
-        <a href="/products"><i class="bi bi-box"></i> Products</a>
-        <a href="/raw-materials"><i class="bi bi-droplet"></i> Raw Materials</a>
-        <a href="/bom"><i class="bi bi-diagram-3"></i> BOM</a>
-        <a href="/production"><i class="bi bi-gear"></i> Production</a>
-        <a href="/purchase"><i class="bi bi-truck"></i> Purchase</a>
-        <a href="/sales"><i class="bi bi-cart"></i> Sales</a>
-        <a href="/stock"><i class="bi bi-archive"></i> Stock</a>
-        <a href="/customers"><i class="bi bi-people"></i> Customers</a>
-        <a href="/suppliers"><i class="bi bi-building"></i> Suppliers</a>
-        <a href="/reports"><i class="bi bi-bar-chart"></i> Reports</a>
+        <a href="/dashboard" {% if not permissions.can_dashboard %}style="display:none"{% endif %}>
+    <i class="bi bi-speedometer2"></i> Dashboard
+</a>
 
-        {% if session.role == "admin" %}
-        <a href="/users"><i class="bi bi-shield-lock"></i> User Management</a>
-        {% endif %}
+<a href="/products" {% if not permissions.can_products %}style="display:none"{% endif %}>
+    <i class="bi bi-box"></i> Products
+</a>
+
+<a href="/raw-materials" {% if not permissions.can_raw_materials %}style="display:none"{% endif %}>
+    <i class="bi bi-droplet"></i> Raw Materials
+</a>
+
+<a href="/bom" {% if not permissions.can_bom %}style="display:none"{% endif %}>
+    <i class="bi bi-diagram-3"></i> BOM
+</a>
+
+<a href="/production" {% if not permissions.can_production %}style="display:none"{% endif %}>
+    <i class="bi bi-gear"></i> Production
+</a>
+
+<a href="/purchase" {% if not permissions.can_purchase %}style="display:none"{% endif %}>
+    <i class="bi bi-truck"></i> Purchase
+</a>
+
+<a href="/sales" {% if not permissions.can_sales %}style="display:none"{% endif %}>
+    <i class="bi bi-cart"></i> Sales
+</a>
+
+<a href="/stock" {% if not permissions.can_stock %}style="display:none"{% endif %}>
+    <i class="bi bi-archive"></i> Stock
+</a>
+
+<a href="/customers" {% if not permissions.can_customers %}style="display:none"{% endif %}>
+    <i class="bi bi-people"></i> Customers
+</a>
+
+<a href="/suppliers" {% if not permissions.can_suppliers %}style="display:none"{% endif %}>
+    <i class="bi bi-building"></i> Suppliers
+</a>
+
+<a href="/reports" {% if not permissions.can_reports %}style="display:none"{% endif %}>
+    <i class="bi bi-bar-chart"></i> Reports
+</a>
+
+<a href="/users" {% if not permissions.can_users %}style="display:none"{% endif %}>
+    <i class="bi bi-shield-lock"></i> User Management
+</a>
+
     </div>
 
     <!-- MAIN -->
